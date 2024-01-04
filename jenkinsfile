@@ -1,0 +1,48 @@
+pipeline {
+    agent any
+
+    environment {
+        TF_HOME = tool 'Terraform'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    git 'https://github.com/fgonzavz/gcp-terraform.git'
+                }
+            }
+        }
+
+        stage('Terraform Plan') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'terraform-credentials', variable: 'GOOGLE_CREDENTIALS')]) {
+                        sh "echo '$GOOGLE_CREDENTIALS' > account.json"
+                        sh "${TF_HOME}/bin/terraform init -backend-config=backend.tfvars"
+                        sh "${TF_HOME}/bin/terraform plan -out=tfplan"
+                    }
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'terraform-credentials', variable: 'GOOGLE_CREDENTIALS')]) {
+                        sh "echo '$GOOGLE_CREDENTIALS' > account.json"
+                        sh "${TF_HOME}/bin/terraform apply -auto-approve tfplan"
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                sh 'rm -rf .terraform'
+            }
+        }
+    }
+}
